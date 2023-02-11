@@ -87,6 +87,15 @@ function step2(ang){
     return out;
 }
 
+
+function getRandomRYB(p){
+    p = p%1.;
+    var cryb = map2(p);
+    // cryb = saturatecol(cryb, map(fxrand(), 0, 1, -.3, .3));
+    // cryb = brightencol(cryb, map(fxrand(), 0, 1, -.3, .3));
+    return cryb;
+}
+
 function ryb2rgb(r, y, b){
     var rin = r;
     var yin = y;
