@@ -462,7 +462,7 @@ class SkeletBlob extends Skelet{
         super();    
         this.N = round(random(5, 44))*0+13;
         this.NN = this.N;
-        this.R = random(22, 66);
+        this.R = random(45, 55);
         this.blobpoints = [];
         this.tentacleroots = [];
         this.roots = [];
