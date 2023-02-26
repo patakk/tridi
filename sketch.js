@@ -5,6 +5,7 @@ let blurH;
 let blurV;
 
 var fbo;
+var drawingFbo;
 var effectFbo;
 var bhFbo;
 var bvFbo;
@@ -14,20 +15,21 @@ var charFbos = {};
 
 var cl1, cl2, cl3, cl4;
 
-var mm;
-var WW, HH;
-var ratio = Math.sqrt(2);
+let mm;
+let WW, HH;
+let ratio = Math.sqrt(2);
+//ratio = 1;
 let margin = 50;
 //var resx = map(fxrand(), 0, 1,  1000, 1400);
 //var resy = Math.round(1580*1000/resx);
 var resx, resy;
 if(fxrand() < -.5){
-    resx = 1400;
-    resy = Math.round(1400/ratio);
+    resx = 1100;
+    resy = Math.round(1100/ratio);
 }
 else{
-    resx = Math.round(1400/ratio);
-    resy = 1400;
+    resx = Math.round(1100/ratio);
+    resy = 1100;
 }
 //resx=resy=1400;
 var res = Math.min(resx, resy);
@@ -49,6 +51,24 @@ var pts = [];
 
 //let plt1 = 0.8;
 let plt1 = 0.1;
+
+
+let skelets = [];
+let skeletBlob;
+let skeletTentacles= [];
+let stargets = [];
+let ntargets = 4;
+
+let people = [];
+
+let mx;
+let my;
+let cursor;
+let cursorp;
+const NOTROOT = false;
+
+let mainHue;
+let mainCol;
 
 function preload() {
     effect = loadShader('assets/shaders/effect.vert', 'assets/shaders/effect.frag');
@@ -82,19 +102,48 @@ function setupCanvas(){
     canvas.id('maincanvas');
 }
 
+function getClosesFromList(p, ps){
+    let md = 100000;
+    let pt;
+    for(let k = 0; k < ps.length; k++){
+        let d = dist(p.x, p.y, ps[k].x, ps[k].y);
+        if(d < md){
+            md = d;
+            pt = ps[k];
+        }
+    }
+    return [pt, md];
+}
+
+
+function createTargets(){
+    let targets = [];
+    for(let k = 0; k < ntargets; k++){
+        if(targets.length == 0){
+            targets.push(createVector(.8*random(-resx/2, resx/2), .8*random(-resy/2, resy/2)))
+            continue;
+        }
+        let candidates = [];
+        for(let c = 0; c < 50; c++){
+            candidates.push(createVector(.8*random(-resx/2, resx/2), .8*random(-resy/2, resy/2)))
+        }
+        let best;
+        let mind = -1;
+        for(let c = 0; c < candidates.length; c++){
+            let cand = candidates[c];
+            let dd = getClosesFromList(cand, targets)[1];
+            if(dd > mind){
+                mind = dd;
+                best = cand;
+            }
+        }
+        targets.push(best);
+    }
+    return targets;
+}
+
 function setup(){
     setupCanvas()
-
-    var p5Canvas = document.getElementById("maincanvas");
-    var w = document.getElementById("maincanvas").offsetWidth;
-    var h = document.getElementById("maincanvas").offsetHeight;
-    //p5Canvas.style.height = h-margin + 'px';
-    //p5Canvas.style.width = w-margin + 'px';
-
-    song = loadSound('assets/swoosh1.mp3');
-
-    skelet = new Skelet();
-
 
     imageMode(CENTER);
     randomSeed(globalseed);
@@ -102,116 +151,100 @@ function setup(){
 
     print('fxhash:', fxhash);
 
-    //setAttributes('premultipliedAlpha', true);
-    //setAttributes('antialias', true);
-
-    //pg = createGraphics(resx, resy, WEBGL);
-    //pg.colorMode(RGB, 1);
-    //pg.noStroke();
     curveDetail(44);
-    //pg.textFont(inconsolata);
-    //ortho(-resx/2, resx/2, -resy/2, resy/2, 0, 4444);
     textFont(inconsolata);
     textAlign(CENTER, CENTER);
     imageMode(CENTER);
     rectMode(CENTER);
     colorMode(RGB, 1);
 
-    //prepareFbos();
-
-    //drawCube(pg);
-
-
-    //pg.rotateY(accas);
-    //mask.rotateY(accas);
-
     fbo = new p5Fbo({renderer: canvas, width: resx*2, height: resy*2});
+    drawingFbo = new p5Fbo({renderer: canvas, width: resx*2, height: resy*2});
     effectFbo = new p5Fbo({renderer: canvas, width: resx*2, height: resy*2});
     bhFbo = new p5Fbo({renderer: canvas, width: resx*2, height: resy*2});
     bvFbo = new p5Fbo({renderer: canvas, width: resx*2, height: resy*2});
 
+    mainHue = random(1);
+    mainCol = getRandomRYB(mainHue);
+    skeletBlob = new SkeletBlob();
+    stargets = createTargets();
 
-    //setAttributes('premultipliedAlpha', true);
-    //setAttributes('antialias', true);
+    drawingFbo.begin();
+    background(.1);
+    drawingFbo.end();
 
-    //pg = createGraphics(resx, resy, WEBGL);
-    //pg.colorMode(RGB, 1);
-    //pg.noStroke();
-    curveDetail(44);
-    //pg.textFont(inconsolata);
-    //ortho(-resx/2, resx/2, -resy/2, resy/2, 0, 4444);
-    textFont(inconsolata);
-    textAlign(CENTER, CENTER);
-    imageMode(CENTER);
-    rectMode(CENTER);
-    colorMode(RGB, 1);
-
-    //prepareFbos();
-
-    //drawCube(pg);
-
-
-    
-    fbo.begin();
-    ortho(-resx/2, resx/2, -resy/2, resy/2, 0, 4444);
-    clear();
-    background(plt1);
-    noStroke();
-    fill(0);
-    ellipse(random(-1,1), random(-1,1), 55, 55);
-
-    fbo.end();
     showall();
     showall();
     // fxpreview();
-    noCursor();
-
+    // noCursor();
 }
 
-let skelets = [];
-let skelet;
+function calcMouse(){
+    mx = map(mouseX, 0, width, -resx/2, resx/2);
+    my = map(mouseY, 0, height, -resy/2, resy/2);
+}
 
-let people = [];
 
-let mx;
-let my;
-let cursor;
-let cursorp;
-const NOTROOT = false;
+function drawTargets(){
+    fill(.5);
+    for(let k = 0; k < stargets.length; k++){
+        let t = stargets[k];
+        push();
+        noStroke();
+        translate(0,0,10);
+        rect(t.x, t.y, 10, 2);
+        rect(t.x, t.y, 2, 10);
+        pop();
+    }
+}
+
+function drawMouse(){
+    noStroke();
+    fill(0);
+    push();
+    translate(0,0,10);
+    rect(map(mouseX, 0, width, -resx/2, resx/2), map(mouseY, 0, height, -resy/2, resy/2), 10, 2);
+    rect(map(mouseX, 0, width, -resx/2, resx/2), map(mouseY, 0, height, -resy/2, resy/2), 2, 10);
+    pop();
+}
 
 
 function draw(){
 
-    mx = map(mouseX, 0, width, -resx/2, resx/2);
-    my = map(mouseY, 0, height, -resy/2, resy/2);
+    calcMouse();
+
 
     fbo.begin();
     clear();
     ortho(-resx/2, resx/2, -resy/2, resy/2, 0, 4444);
-    background(0.15);
-   
-    noStroke();
-    fill(1);
-    rect(map(mouseX, 0, width, -resx/2, resx/2), map(mouseY, 0, height, -resy/2, resy/2), 10, 2);
-    rect(map(mouseX, 0, width, -resx/2, resx/2), map(mouseY, 0, height, -resy/2, resy/2), 2, 10);
 
-    skelet.solve();
-    skelet.draw();
+    let backgroundColor = getRandomRYB(.41);
+    backgroundColor = brightencol(backgroundColor, -1.0);
+    backgroundColor = saturatecol(backgroundColor, .0);
+    background(backgroundColor);
+    
+    push();
+    translate(0,0,-100);
+    drawingFbo.draw(0, 0, resx, resy);
+    pop();
 
-    // for(let k = 0; k < people.length; k++){
-    //     let avav = p5.Vector.sub(people[k].spine1.pos, people[k].spine1.parent.pos).heading();
-    //     let veve = createVector(1, 0);
-    //     veve.rotate(avav);
-    //     veve.rotate(PI/2);
-    //     veve.mult(20*sin(frameCount*0.27));
-    //     people[k].root.pos.x = skelet.points[round(1000*noise(k*13.41, 94.31))%skelet.points.length].x;
-    //     people[k].root.pos.y = skelet.points[round(1000*noise(k*13.41, 94.31))%skelet.points.length].y;
-    //     people[k].solve();
-    //     people[k].drawDebug();
-    // }
+    drawTargets();
+    // drawMouse();
+    
+
+    // recording tentacles endings BEFORE applying the physics step
+    // (in order to draw everything in between, to avoid gaps)
+    skeletBlob.recordEndgins();
+
+    skeletBlob.resetForce();
+    skeletBlob.solveForce();
+    skeletBlob.solveVelPos();
+    skeletBlob.draw();
 
     fbo.end();
 
+    // draw trail on surface
+    skeletBlob.drawPermanent();
     showall();
     //if(frameCount > 33)
     //    noLoop();
@@ -220,11 +253,13 @@ function draw(){
 
 class Constraint{
     constructor(p1, p2, d, show=true){
+        this.seed = random(100000);
         this.p1 = p1;
         this.p2 = p2;
         this.d = d;
         this.cd = d;
         this.show = show;
+        this.stiffness = 0.9;
     }
 
     update(){
@@ -232,6 +267,10 @@ class Constraint{
         let p2 = this.p2;
         let distance = this.d;
         
+        // if(this.isWobbly == true){
+        //     this.cd += 10*noise(frameCount*0.01, this.seed);
+        // }
+
         let relativePos = p5.Vector.sub(p2, p1);
         let offsetDir = relativePos.copy();
         offsetDir.normalize();
@@ -242,36 +281,556 @@ class Constraint{
         let relativeVelocity = p5.Vector.sub(p2.vel, p1.vel);
 
         let velocityImpact = p5.Vector.dot(relativeVelocity, offsetDir);
-        let biasFactor = .5;
+        let biasFactor = this.stiffness;
         let bias = biasFactor * offset;
 
-        let lambda = -(velocityImpact*.0 + bias) / 2.; // 2 je 1+1, masa jednog i drugog
+        let lambda = -(velocityImpact*0 + bias) / 2.; // 2 je 1+1, masa jednog i drugog
 
         let impulse1 = offsetDir.copy();
         let impulse2 = offsetDir.copy();
         
-        impulse1.mult(lambda);
-        impulse2.mult(-lambda);
+        impulse1.mult(lambda/p1.mass);
+        impulse2.mult(-lambda/p2.mass);
 
         if(this.name === 'nula'){
             //print(impulse1.mag())
         }
-
-
+        
         this.p1.acc.add(impulse1);
         this.p2.acc.add(impulse2);
-        
     }
 }
 
 
+
 class Skelet {
     constructor(x=0, y=0) {
-        this.nx = 6;
-        this.ny = 6;
-        let ratio = this.nx / this.ny;
         this.points = [];
         this.constraints = [];
+    }
+
+    resetForce(){
+        for(let k = 0; k < this.points.length; k++){
+            let po = this.points[k];
+            po.acc.mult(0);
+        }
+    }
+
+    solveForce(){
+
+        let mx = map(mouseX, 0, width, -resx/2, resx/2);
+        let my = map(mouseY, 0, height, -resy/2, resy/2);
+        let mv = createVector(mx, my);
+
+        let eps = 2;
+        
+        for(let kk = 0; kk < 1; kk++){
+            for(let k = 0; k < this.constraints.length; k++){
+                this.constraints[k].update();
+            }
+        }
+
+        // border, mouse, and gravity
+        let brd = 20;
+        let rv = createVector(1, 0).mult(3);
+        let lv = createVector(-1, 0).mult(3);
+        let uv = createVector(0, -1).mult(3);
+        let dv = createVector(0, 1).mult(3);
+        let gravity = createVector(0, 1).mult(.0);
+
+        for(let k = 0; k < this.points.length; k++){
+            let po = this.points[k];
+            let totalforce = createVector(0, 0);
+            let fom = p5.Vector.sub(po, mv);
+            fom.normalize();
+            let dm = dist(mx, my, po.x, po.y);
+            let p = 1;
+            if(dm < 900 && dm > 66){
+                p = map(dm, 66, 900, 0, 1);
+                fom.mult(p*26*po.sspeed);
+            }
+            else{
+                fom.mult(0);
+            }
+
+            let borderForce = createVector(0, 0);
+            if(po.x > resx/2-brd){
+                borderForce.add(lv);
+            }
+            if(po.x < -resx/2+brd){
+                borderForce.add(rv);
+            }
+            if(po.y > resy/2-brd){
+                borderForce.add(uv);
+            }
+            if(po.y < -resy/2+brd){
+                borderForce.add(dv);
+            }
+
+            let turbulence = createVector(0, 0);
+            turbulence.x = .2*(-.5 + power(noise(po.x*.01+100, po.y*.01+100, 56.123+frameCount*0.004), 2));
+            turbulence.y = .2*(-.5 + power(noise(po.x*.01+100, po.y*.01+100, 31.314+frameCount*0.004), 2));
+
+            totalforce.add(gravity);
+            totalforce.add(turbulence);
+
+            fom.mult(-1);
+            if(po.type == 'head')
+                totalforce.add(fom);
+
+            if(po.type == 'active'){
+                let outward = p5.Vector.sub(po.troot, this.center).normalize();
+                let target = getClosesFromList(po.troot, stargets)[0];
+                let totarget = p5.Vector.sub(target, po);
+                totarget.normalize();
+                let dm = dist(target.x, target.y, po.x, po.y);
+                let p = 1;
+                if(dm < 500 && dm > 4 && totarget.dot(outward) > 0.4){
+                    p = map(dm, 4, 500, 0, 1);
+                    totarget.mult(p*6*po.sspeed);
+                }
+                else{
+                    totarget.mult(0);
+                }
+                totalforce.add(totarget);
+            }
+        
+
+            po.acc.add(totalforce);
+
+            
+            // po.vel.add(po.acc);
+            // po.vel.mult(.9);
+            // po.add(po.vel);
+        }
+
+        
+        for(let k = 0; k < this.constraints.length; k++){
+            this.constraints[k].d = this.constraints[k].d + .1*(this.constraints[k].cd - this.constraints[k].d);
+        }
+
+        for(let it = 0; it < this.tentacleroots.length; it++){
+            let tent = this.tentacleroots[it];
+
+            for(let pt = 2; pt < tent.length; pt++){
+                let po = tent[pt%tent.length];
+
+                let clo = -1;
+                let md = 10000;
+                for(let bp = 0; bp < this.blobpoints.length; bp++){
+                    let bo = this.blobpoints[bp];
+                    let d = p5.Vector.sub(bo, po).mag();
+                    if(d < md){
+                        md = d;
+                        clo = bp;
+                    }
+                }
+                let p1 = this.blobpoints[clo];
+                let p1a = this.blobpoints[(clo+1)%this.blobpoints.length];
+                let p1b = this.blobpoints[(clo+this.blobpoints.length-1)%this.blobpoints.length];
+                let dir = p5.Vector.sub(p1b, p1a).normalize();
+                dir.rotate(PI/2);
+                if(md < 20)
+                    po.acc.add(dir);
+            }
+            // stroke(0.8, 0, 0);
+            // noFill();
+            // beginShape();
+            // for(let k = 0; k < tent.length; k++){
+            //     vertex(tent[k%tent.length].x, tent[k%tent.length].y);
+            // }
+            // endShape();
+            
+            // fill(1);
+            // noStroke();
+            // for(let k = 0; k < tent.length; k++){
+            //     rect(tent[k%tent.length].x, tent[k%tent.length].y, 4, 4);
+            // }
+        }
+        // this.points[0].x = mv.x;
+        // this.points[0].y = mv.y;
+    }
+
+    solveVelPos(){
+        for(let k = 0; k < this.points.length; k++){
+            let po = this.points[k];
+            po.vel.add(po.acc);
+            po.vel.mult(.9);
+            po.add(po.vel);
+        }
+    }
+
+}
+
+class SkeletBlob extends Skelet{
+    constructor(){
+        super();    
+        this.N = round(random(5, 44))*0+27;
+        this.NN = this.N;
+        this.R = random(22, 66);
+        this.blobpoints = [];
+        this.tentacleroots = [];
+        this.roots = [];
+        this.generate();    
+        this.generateTents();    
+        this.center = createVector(0, 0);
+    }
+
+    generate(){
+        for(let k = 0; k < this.N; k++){
+            let ang = map(k, 0, this.N, 0, 2*PI);
+            let x = this.R * cos(ang);
+            let y = this.R * sin(ang);
+            let v = createVector(x, y);
+            v.vel = createVector(0, 0);
+            v.acc = createVector(0, 0);
+            v.mass = 1;
+            v.type = 'head';
+            v.sspeed = random(1, 3);
+            this.points.push(v);
+            this.blobpoints.push(v);
+        }
+        for(let k = 0; k < this.points.length; k++){
+            let point = this.points[k];
+            let pointp = this.points[(k+1)%this.points.length];
+            let d = p5.Vector.sub(pointp, point).mag() * map(power(noise(point.x*0.008+10, point.y*0.008+10, 135.1), 3), 0, 1, .9, 1.1);
+            let constraint = new Constraint(point, pointp, d);
+            this.constraints.push(constraint);
+        }
+        
+          for(let k = 0; k < this.points.length; k++){
+              let point = this.points[k];
+              let pointp = this.points[(k+3)%this.points.length];
+              let d = p5.Vector.sub(pointp, point).mag();
+              let constraint = new Constraint(point, pointp, d);
+              constraint.show = false;
+              constraint.stiffness = 0.1;
+              this.constraints.push(constraint);
+          }
+        //  for(let k = 0; k < this.points.length; k++){
+        //      let point = this.points[k];
+        //      let pointp = this.points[(k+4)%this.points.length];
+        //      let d = p5.Vector.sub(pointp, point).mag();
+        //      let constraint = new Constraint(point, pointp, d);
+        //      constraint.show = false;
+        //      this.constraints.push(constraint);
+        //  }
+         for(let k = 0; k < this.points.length; k++){
+             let point = this.points[k];
+             let pointp = this.points[(k+9)%this.points.length];
+             let d = p5.Vector.sub(pointp, point).mag();
+             let constraint = new Constraint(point, pointp, d);
+             constraint.show = false;
+             constraint.stiffness = 0.1;
+             this.constraints.push(constraint);
+         }
+    }
+
+    generateTents(){
+        for(let it = 0; it < this.NN; it++){
+            let ri = floor(random(this.blobpoints.length));
+            let po = this.blobpoints[ri].copy();
+            let dir = po.copy().normalize().mult(25);
+            let pv = po;
+            let v;
+            let tete = [];
+            let le = round(random(2, 8)*1.6);
+            if(it == 0)
+                le = 16;
+            let oo = round(random(1, le/2));
+            oo = floor(random(1, 2));
+            oo = 1;
+            for(let k = 0; k < le; k++){
+                if(k == 0)
+                    v = this.blobpoints[ri];
+                else
+                    v = po.copy();
+                v.vel = createVector(0, 0);
+                v.acc = createVector(0, 0);
+                v.mass = 1;
+                if(k == le-oo){
+                    v.type = 'active';
+                    v.troot = this.blobpoints[ri];
+                }
+                v.sspeed = random(1, 3);
+                    
+                tete.push(v);
+                if(k > 0){
+                    this.points.push(v);
+                    let point = pv;
+                    let pointp = v;
+                    let d = p5.Vector.sub(pointp, point).mag();
+                    let constraint = new Constraint(point, pointp, d);
+                    constraint.stiffness = random(.2, .9);
+                    this.constraints.push(constraint);
+                }
+    
+                pv = v;
+                po.add(dir);
+            }
+            this.tentacleroots.push(tete);
+            this.roots.push(ri);
+        }
+    }
+
+    draw(){
+        var knots = makeknots(this.blobpoints, 1, true);
+        var hobbypts = gethobbypoints(knots, true, 10);
+        stroke(1-1.0);
+        noFill();
+        // noStroke();
+        // fill(1-1.0);
+        fill(.8, .79, .76);
+        fill(0);
+        fill(1-0.58);
+        fill(getRandomRYB(.02));
+        stroke(getRandomRYB(.2));
+        noStroke();
+        // drawhobby(knots, 1);
+
+        // stroke(0.8);
+        // noFill();
+        fill(getRandomRYB(.2));
+        let leColor = getRandomRYB(mainHue + 1*.21);
+        leColor = saturatecol(leColor, 1*-.5);
+        leColor = brightencol(leColor, 1*.5);
+        fill(leColor);
+        
+        // the BLOB
+        push();
+        translate(0,0,-11);
+        beginShape();
+        strokeWeight(.5+1*power(noise(frameCount*0.01,93.31), 3));
+        this.center.set(0, 0);
+        for(let k = 0; k < this.blobpoints.length; k++){
+            let amp = 1;
+            let nzx = amp*0*25*(-.5 + power(noise(132.41, k, frameCount*0.1), 2));
+            let nzy = amp*0*25*(-.5 + power(noise(132.41, k+1134.31, frameCount*0.1), 2));
+            let x = this.blobpoints[k%this.blobpoints.length].x+nzx;
+            let y = this.blobpoints[k%this.blobpoints.length].y+nzy;
+            vertex(x, y);
+            // if(random(100) < 1) rect(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy, 2*random(1,2), 2*random(1,2));
+            this.center.add(this.blobpoints[k%this.blobpoints.length]);
+        }
+        this.center.div(this.blobpoints.length);
+        endShape(CLOSE);
+        pop();
+        
+        // BLOB border        
+        // push();
+        // translate(0,0,-11);
+        // beginShape();
+        // strokeWeight(.5+1*power(noise(frameCount*0.01,55.22), 3));
+        // for(let k = 0; k < this.blobpoints.length; k++){
+        //     let amp = 1;
+        //     let nzx = amp*25*(-.5 + power(noise(55.41, k, frameCount*0.1), 2));
+        //     let nzy = amp*25*(-.5 + power(noise(55.41, k+3134.31, frameCount*0.1), 2));
+        //     vertex(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy);
+        //     if(random(100) < 1) rect(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy, 2*random(1,2), 2*random(1,2));
+        // }
+        // stroke(123/255, 1/255, 15/255);
+        // stroke(getRandomRYB(.9*power(noise(491.331, frameCount*0.1), 3)));
+        // stroke(.8, .5, .5);
+        // noFill();
+        // endShape(CLOSE);
+        // pop();
+        // push();
+        // translate(0,0,-11);
+        // beginShape();
+        // strokeWeight(.5+1*power(noise(frameCount*0.01,24.87), 3));
+        // for(let k = 0; k < this.blobpoints.length; k++){
+        //     let amp = 1;
+        //     let nzx = amp*25*(-.5 + power(noise(121.41, k, frameCount*0.1), 2));
+        //     let nzy = amp*25*(-.5 + power(noise(121.41, k+3134.31, frameCount*0.1), 2));
+        //     vertex(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy);
+        //     if(random(100) < 1) rect(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy, 2*random(1,2), 2*random(1,2));
+        // }
+        // stroke(0.24, 0.44, 0.44);
+        // stroke(getRandomRYB(.9*power(noise(91.66, frameCount*0.1), 3)));
+        // stroke(.8, .5, .5);
+        // noFill();
+        // endShape(CLOSE);
+        // pop();
+        
+        strokeWeight(.5+1*power(noise(frameCount*0.01,24.87), 3));
+        for(let it = 0; it < this.tentacleroots.length; it++){
+            push();
+            translate(0, it*.1);
+            let tent = this.tentacleroots[it];
+            
+            stroke(1-1.0);
+            noFill();
+            //  var knots = makeknots(tent, 1, false);
+            //  var hobbypts = gethobbypoints(knots, false, 10);
+            //  drawhobby(knots, 0);
+            // stroke(0.8, 0, 0);
+            // noFill();
+
+            // tentacle thin line
+            // push();
+            // translate(0,0,-1);
+            // stroke(0.58, 0.24, 0.24);
+            // let col = getRandomRYB(noise(it)*10.);
+            // col = getRandomRYB(0);
+            // col = saturatecol(col, -.7);
+            // col = brightencol(col, -.7);
+            // stroke(col);
+            // stroke(mainCol);
+            // noFill();
+            // beginShape();
+            // for(let k = 0; k < tent.length; k++){
+            //     let amp = map(k, 0, tent.length-1, 0, 1);
+            //     amp = power(1 - abs(amp-.5)*2, 2);
+            //     let nzx = amp*30*(-.5 + power(noise(it, k, frameCount*0.1), 2));
+            //     let nzy = amp*30*(-.5 + power(noise(it, k+3134.31, frameCount*0.1), 2));
+            //     if(k == 0)
+            //         vertex(tent[k%tent.length].x+nzx, tent[k%tent.length].y+nzy);
+            //     vertex(tent[k%tent.length].x+nzx, tent[k%tent.length].y+nzy);
+            //     if(k == tent.length-1)
+            //         vertex(tent[k%tent.length].x+nzx, tent[k%tent.length].y+nzy);
+            // }
+            // endShape();
+            // pop();
+
+            // tentacle body
+            noStroke();
+            fill(0);
+            fill(.8);
+            // tentacle tip
+            rect(tent[tent.length-1].x, tent[tent.length-1].y, 4, 4);
+            let left = skeletBlob.blobpoints[(this.roots[it]-1+skeletBlob.blobpoints.length)%skeletBlob.blobpoints.length];
+            let right = skeletBlob.blobpoints[(this.roots[it]+1)%skeletBlob.blobpoints.length];
+            fill(0);
+            fill(mainCol);
+            noStroke();
+            beginShape(TRIANGLE_STRIP);
+            // vertex(left.x, left.y);
+            // vertex(left.x, left.y);
+            let th = 4 + 4*power(noise(it, 5412.21), 3);
+            let punctured = p5.Vector.sub(tent[0], tent[1]).normalize();
+            punctured.mult(10);
+            punctured.add(tent[0]);
+            for(let k = -1; k < tent.length-1; k++){
+                let p = map(k, 0, tent.length-1, 1, 0);
+                p = constrain(p, 0, 1);
+                let t1;
+                if(k>=0)
+                    t1 = tent[k];
+                else
+                    t1 = punctured;
+                let t2 = tent[k+1];
+                let ve = p5.Vector.sub(t2, t1);
+                let ven = ve.copy().normalize();
+                let nz = map(power(noise(it, k, 55.27), 3), 0, 1, .5, 2.0);
+
+                let leColor = getRandomRYB(mainHue + p*.21);
+                leColor = saturatecol(leColor, p*-.5);
+                leColor = brightencol(leColor, p*.5);
+
+                if(p > .8){
+                    p = .8 - (p-.8);
+                }
+                ven.rotate(-PI/2);
+                ven.mult(p * th * nz);
+                ven.add(t1);
+                fill(leColor);
+                vertex(ven.x, ven.y);
+                ven = ve.copy().normalize();
+                ven.rotate(+PI/2);
+                ven.mult(p * th * nz);
+                ven.add(t1);
+                vertex(ven.x, ven.y);
+            }
+            vertex(tent[tent.length-1].x, tent[tent.length-1].y);
+            // for(let k = tent.length-2; k >= 0; k--){
+            //     let p = map(k, 0, tent.length-1, 1, 0);
+            //     let t1 = tent[k];
+            //     let t2 = tent[k+1];
+            //     let ve = p5.Vector.sub(t2, t1);
+            //     let ven = ve.copy().normalize();
+            //     let nz = map(power(noise(it, k, 81.31), 3), 0, 1, .5, 2.0);
+            //     ven.rotate(+PI/2);
+            //     ven.mult(p * th *nz);
+            //     ven.add(t1);
+            //     fill(p);
+            //     vertex(ven.x, ven.y);
+            // }
+            // vertex(right.x, right.y);
+            // vertex(right.x, right.y);
+            endShape();
+            pop();
+
+        }
+    }
+
+    recordEndgins(){
+        this.tentrail = [];
+        for(let it = 0; it < skeletBlob.tentacleroots.length; it++){
+            let tent = skeletBlob.tentacleroots[it];
+            this.tentrail.push(tent[tent.length-1].copy());
+        }
+    }
+
+    
+    drawPermanent(){
+        drawingFbo.begin();
+        ortho(-resx/2, resx/2, -resy/2, resy/2, 0, 4444);
+        fill(.45);
+        noStroke();
+        for(let it = 0; it < skeletBlob.tentacleroots.length; it++){
+
+            let hueDivergence = .6;
+            if(noise(it, 9999.31) < .625){
+                hueDivergence = .2;
+            }
+            else{
+                hueDivergence = 1.;
+            }
+
+            let col = getRandomRYB(noise(it)*10.);
+            col = saturatecol(col, -.7);
+            col = brightencol(col, -.7);
+            fill(col);
+            fill(.1);
+            col = getRandomRYB(0.3 + 1.5*noise(it, frameCount*0.03));
+            col = getRandomRYB(mainHue + hueDivergence*(-.5 + power(noise(it, frameCount*0.01), 2)));
+            col = saturatecol(col, 1*(-.5 + power(noise(it, frameCount*0.03, 1112.), 2)));
+            col = brightencol(col, .2+.1*sin(frameCount*.01 + 1000*noise(it)));
+            fill(col);
+            let tent = skeletBlob.tentacleroots[it];
+            let dir = p5.Vector.sub(tent[tent.length-1], this.tentrail[it]);
+            let le = dir.mag();
+            let lim = max(1, le*2);
+            for(let k = 0; k < lim; k++){
+                let p = map(k, 0, lim, 0, 1);
+                let x = lerp(this.tentrail[it].x, tent[tent.length-1].x, p);
+                let y = lerp(this.tentrail[it].y, tent[tent.length-1].y, p);
+                push();
+                translate(0,0,it+frameCount*.04)
+                fill(col);
+                rect(x, y, 118*power(noise(it,99.31), 3), 118*power(noise(it,99.31), 3));
+                let fl = .05 + .1*(-.5 + power(noise(it, frameCount*0.01, 22.66), 3));
+                fill(fl+.7, .25, .25);
+                let sz = 1.5 + 1.5*(-.5 + power(noise(it, frameCount*0.01, 831.41), 3));
+                fill(0, .4*power(noise(it, frameCount*0.1, 22.341), 3));
+                translate(0,0,it+frameCount*.04+1)
+                rect(x, y, sz*0+1, sz*0+1);
+                pop();
+            }
+        }
+        drawingFbo.end();
+    }
+}
+
+class SkeletGrid extends Skelet{
+    constructor(){
+        super();    
+        this.generate();    
+    }
+
+    generate(){
+        this.nx = 6;
+        this.ny = 6;
         for(let j = 0; j < this.ny; j++){
             for(let i = 0; i < this.nx; i++){
                 let x = map(i, 0, this.nx-1, -200*ratio, 200*ratio);
@@ -279,6 +838,7 @@ class Skelet {
                 let v = createVector(x, y);
                 v.vel = createVector(0, 0);
                 v.acc = createVector(0, 0);
+                v.mass = 100;
                 this.points.push(v);
             }
         }
@@ -313,136 +873,6 @@ class Skelet {
             }
         }
         this.constraints[0].name = 'nula';
-    }
-
-    solve(){
-
-        let mx = map(mouseX, 0, width, -resx/2, resx/2);
-        let my = map(mouseY, 0, height, -resy/2, resy/2);
-        let mv = createVector(mx, my);
-
-        let eps = 2;
-        
-        for(let k = 0; k < this.points.length; k++){
-            let po = this.points[k];
-            po.acc.mult(0);
-        }
-        
-        for(let kk = 0; kk < 1; kk++){
-            for(let k = 0; k < this.constraints.length; k++){
-                this.constraints[k].update();
-            }
-        }
-
-        // border, mouse, and gravity
-        let brd = 20;
-        let rv = createVector(1, 0).mult(3);
-        let lv = createVector(-1, 0).mult(3);
-        let uv = createVector(0, -1).mult(3);
-        let dv = createVector(0, 1).mult(3);
-        let gravity = createVector(0, 1).mult(.0);
-
-        for(let k = 0; k < this.points.length; k++){
-            let po = this.points[k];
-            let fom = p5.Vector.sub(po, mv);
-            fom.normalize();
-            let dm = dist(mx, my, po.x, po.y);
-            if(dm < 144){
-                let p = map(dm, 0, 144, 1, 0);
-                fom.mult(p*33);
-            }
-            else{
-                fom.mult(0);
-            }
-
-            if(po.x > resx/2-brd){
-                fom.add(lv);
-            }
-            if(po.x < -resx/2+brd){
-                fom.add(rv);
-            }
-            if(po.y > resy/2-brd){
-                fom.add(uv);
-            }
-            if(po.y < -resy/2+brd){
-                fom.add(dv);
-            }
-
-            fom.add(gravity);
-
-            po.acc.add(fom);
-            po.vel.add(po.acc);
-            po.vel.mult(.9);
-            //po.vel.limit(2);
-            
-            let x1 = k%this.nx;
-            let y1 = floor(k/this.ny);
-            if(x1 != 0 && x1 != this.nx-1 || true) po.add(po.vel);
-        }
-
-        
-        for(let k = 0; k < skelet.constraints.length; k++){
-            this.constraints[k].d = this.constraints[k].d + .1*(this.constraints[k].cd - this.constraints[k].d);
-        }
-        // this.points[0].x = mv.x;
-        // this.points[0].y = mv.y;
-        // this.points[(this.ny-1)*this.nx].y = mv.y;
-        // this.points[(this.ny-1)*this.nx].y = mv.y;
-    }
-
-    draw(){
-        if(frameCount%100 == 0)
-            print(frameRate());
-        noFill();
-        stroke(1, .5);
-        strokeWeight(2);
-        fill(1);
-        noStroke();
-
-        let red = getRandomRYB(0);
-        //beginShape();
-        for(let k = 0; k < this.constraints.length; k++){
-            if(!this.constraints[k].show)
-                continue;
-            let p1 = this.constraints[k].p1;
-            let p2 = this.constraints[k].p2;
-            let mid = p5.Vector.add(p1, p2);
-            let ve = p5.Vector.sub(p2, p1);
-
-            mid.div(2);
-            push();
-            
-            let oo = abs(ve.mag() - this.constraints[k].d)/5;
-            oo = constrain(oo, 0.2, 1)-.2;
-            fill(1*(1-oo) + oo*red[0],1*(1-oo) + oo*red[1],1*(1-oo) + oo*red[2]);
-
-            let co = power(noise(k), 3);
-            // if(noise(k) > .6)
-            //     co += .7;
-            let fc = getRandomRYB(0);
-            fc = saturatecol(fc, -1+oo);
-
-            fill(...fc);
-            // if(noise(k) > .73)
-            //     fill(.9, .7, .7);
-            translate(mid.x, mid.y);
-            rotate(ve.heading());
-            //rect(0, 0, 3, 42.7+.1*power(noise(k*.1), 3));
-            
-            fill(.8, .6, .66);
-            translate(0,0,3);
-            //rect(0, 0, 2, 6.7+.1*power(noise(k*.1), 3));
-            rect(0, 0, ve.mag(), .7+.1*power(noise(k*.1), 3));
-            pop();
-            //line(p1.x, p1.y, p2.x, p2.y);
-        }
-        fill(1);
-        noStroke();
-        for(let k = 0; k < this.points.length; k++){
-            let p1 = this.points[k];
-            //ellipse(p1.x, p1.y, 3, 3);
-            //rect(p1.x, p1.y, 3, 3);
-        }
     }
 }
 
@@ -518,6 +948,8 @@ function showall(){
     //image(pg, 0, 0, mm*resx/resy-xx, mm-xx);
     effectFbo.draw(0, 0, width, height);
 
+    // drawingFbo.draw(0, 0, width, height);
+    // fbo.draw(0, 0, width, height);
 }
 
 function windowResized() {
@@ -1131,17 +1563,17 @@ function gethobbypoints(knots, cycle, det=12){
 
 function drawhobby(knots, cycle) {
     
-    for (var i=0; i<knots.length-1; i++) {
-        push();
-        fill(0);
-        noStroke();
-        translate(knots[i].x_pt, knots[i].y_pt, 0);
-        ellipse(0, 0, 5, 5);
-        pop();
-    }
+    //  for (var i=0; i<knots.length; i+=2) {
+    //      push();
+    //      fill(.6);
+    //      noStroke();
+    //      translate(knots[i].x_pt, knots[i].y_pt, 0);
+    //      ellipse(0, 0, 6, 6);
+    //      pop();
+    //  }
 
     var det = 10;
-    for (var i=0; i<knots.length; i++) {
+    for (var i=0; i<knots.length-1*cycle; i++) {
         var p0x = knots[i].x_pt;
         var p1x = knots[i].rx_pt;
         var p2x = knots[(i+1)%knots.length].lx_pt;
@@ -1174,16 +1606,16 @@ function drawhobby(knots, cycle) {
             x = (1-t)*(1-t)*(1-t)*p0x + 3*(1-t)*(1-t)*t*p1x + 3*(1-t)*t*t*p2x + t*t*t*p3x;
             y = (1-t)*(1-t)*(1-t)*p0y + 3*(1-t)*(1-t)*t*p1y + 3*(1-t)*t*t*p2y + t*t*t*p3y;
 
-            push();
-            fill(0);
-            noStroke();
-            translate(x, y, 0);
-            ellipse(0, 0, 5, 5);
-            pop();
+            // push();
+            // fill(.6);
+            // noStroke();
+            // translate(x, y, 0);
+            // ellipse(0, 0, 3, 3);
+            // pop();
         }
     }
 
-    return;
+    // return;
 
     beginShape();
     vertex(knots[0].x_pt, knots[0].y_pt, 0);

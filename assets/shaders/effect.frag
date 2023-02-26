@@ -146,9 +146,9 @@ void main() {
     //vec2 uvrd = uv - 0.*(1.-uv.y)*1.61*ff*vec2(1., 0.) + 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
     //vec2 uvgd = uv - 0.*1.61*ff*vec2(1., 0.) + 0.*ff*vec2(1., 0.)/u_resolution*2.;
     //vec2 uvbd = uv - 0.*uv.y*1.61*ff*vec2(1., 0.) - 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
-    vec2 uvrd = uv - .22*ff*vec2(1.5, 1.) + 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
-    vec2 uvgd = uv - .22*ff*vec2(1.5, 1.) + 0.*ff*vec2(1., 0.)/u_resolution*2.;
-    vec2 uvbd = uv - .22*ff*vec2(1.5, 1.) - 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
+    vec2 uvrd = uv - .1*ff*vec2(1.5, 1.) + 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
+    vec2 uvgd = uv - .1*ff*vec2(1.5, 1.) + 0.*ff*vec2(1., 0.)/u_resolution*2.;
+    vec2 uvbd = uv - .1*ff*vec2(1.5, 1.) - 0.*333.5*ff*vec2(1., 0.)/u_resolution*2.;
 
     vec4 mask = texture2D(tex2, uvgd) * u_usemask + vec4(1.) * (1.-u_usemask);
     //vec4 maskb = mask;
@@ -188,7 +188,7 @@ void main() {
     //vec4 outc = (1. - (1. - scattered_original)*original);
     vec4 outc;
     outc = (blurred_original*.4+(1.-.4)*scattered_original);  // split between blurred and scatterd
-    outc = (outc*.5+(1.-.5)*original);  // split between original image and the previous line's result
+    outc = (outc*.05+(1.-.05)*original);  // split between original image and the previous line's result
     
     if(u_usemask > .01) outc *= mask;
     //outc = (outc*.99+(1.-.99)*original);
@@ -230,11 +230,11 @@ void main() {
     outc.rgb = 1. - (1.-outc.rgb) * (1. - salt);
     
     float ssalt = randomNoise(uv+seed/1000000.+4.3+.3143+u_time*.0000+fbm(uv)*.02);
-    ssalt = 1.*.05*(smoothstep(.5, .999, ssalt));
+    ssalt = 1.*.08*(smoothstep(.5, .999, ssalt));
     outc.rgb = 1. - (1.-outc.rgb) * (1. - ssalt);
     
     float pepper = randomNoise(uv+seed/1000000.+1.3+.3143+u_time*.0000+fbm(uv)*.02);
-    pepper = 1.*.015*(smoothstep(.5, .999, pepper));
+    pepper = 1.*.021*(smoothstep(.5, .999, pepper));
     outc.rgb -= pepper;
 
     if(hasmargin > 0.4){
@@ -257,6 +257,7 @@ void main() {
     //pepper = .00*(smoothstep(.8, .999, pepper));
     //outc.rgb -= pepper;
 
+    gl_FragColor = vec4(original.rgb, 1.);
     gl_FragColor = vec4(outc.rgb, 1.);
     //gl_FragColor = vec4(vec3(salt*5.),1.);
     //gl_FragColor = vec4(1.,0.,0.,1.);
