@@ -597,13 +597,13 @@ class SkeletBlob extends Skelet{
         beginShape();
         strokeWeight(.5+1*power(noise(frameCount*0.01,93.31), 3));
         this.center.set(0, 0);
-        for(let k = 0; k < this.blobpoints.length; k++){
+        for(let k = 0; k < this.blobpoints.length+3; k++){
             let amp = 1;
             let nzx = amp*0*25*(-.5 + power(noise(132.41, k, frameCount*0.1), 2));
             let nzy = amp*0*25*(-.5 + power(noise(132.41, k+1134.31, frameCount*0.1), 2));
             let x = this.blobpoints[k%this.blobpoints.length].x+nzx;
             let y = this.blobpoints[k%this.blobpoints.length].y+nzy;
-            vertex(x, y);
+            curveVertex(x, y);
             // if(random(100) < 1) rect(this.blobpoints[k%this.blobpoints.length].x+nzx, this.blobpoints[k%this.blobpoints.length].y+nzy, 2*random(1,2), 2*random(1,2));
             this.center.add(this.blobpoints[k%this.blobpoints.length]);
         }
