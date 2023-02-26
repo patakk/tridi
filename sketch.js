@@ -315,6 +315,9 @@ class Skelet {
         let mv = createVector(mx, my);
 
         let eps = 2;
+        let isin = 0;
+        if(mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height)
+            isin = 1;
         
         for(let kk = 0; kk < 1; kk++){
             for(let k = 0; k < this.constraints.length; k++){
@@ -339,7 +342,7 @@ class Skelet {
             let p = 1;
             if(dm < 900 && dm > 66){
                 p = map(dm, 66, 900, 0, 1);
-                fom.mult(p*26*po.sspeed);
+                fom.mult(p*26*po.sspeed*isin);
             }
             else{
                 fom.mult(0);
