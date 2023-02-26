@@ -20,10 +20,10 @@ let WW, HH;
 let ratio = Math.sqrt(2);
 //ratio = 1;
 let margin = 50;
-//var resx = map(fxrand(), 0, 1,  1000, 1400);
+//var resx = map(rand(), 0, 1,  1000, 1400);
 //var resy = Math.round(1580*1000/resx);
 var resx, resy;
-if(fxrand() < -.5){
+if(rand() < -.5){
     resx = 1100;
     resy = Math.round(1100/ratio);
 }
@@ -34,16 +34,7 @@ else{
 //resx=resy=1400;
 var res = Math.min(resx, resy);
 var zoom = .8;
-var globalseed = Math.floor(fxrand()*1000000);
-
-var hasmargin = 1.0 * (fxrand()*100 < 50);
-var numleaves = 10;
-let inconsolata;
-var letters = 'abcdefghijklmnopqrstuvwxyz!?$%&()<>';
-var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ!?$%&()<>';
-var letters = 'abcdefghijklmnopqrstuvwxyz';
-var letters = '023456789';
-var letters = 'abcdeghkmnopqsuvwxyz';
+var globalseed = Math.floor(rand()*1000000);
 
 var randomtint = [.1, .1, .1]
 
@@ -465,7 +456,7 @@ class Skelet {
 class SkeletBlob extends Skelet{
     constructor(){
         super();    
-        this.N = round(random(5, 44))*0+27;
+        this.N = round(random(5, 44))*0+13;
         this.NN = this.N;
         this.R = random(22, 66);
         this.blobpoints = [];
@@ -534,7 +525,7 @@ class SkeletBlob extends Skelet{
             let pv = po;
             let v;
             let tete = [];
-            let le = round(random(2, 8)*1.6);
+            let le = round(random(2, 8)*1.);
             if(it == 0)
                 le = 16;
             let oo = round(random(1, le/2));
@@ -703,6 +694,9 @@ class SkeletBlob extends Skelet{
             fill(0);
             fill(mainCol);
             noStroke();
+            noFill();
+            stroke(mainCol);
+            strokeWeight(4);
             beginShape(TRIANGLE_STRIP);
             // vertex(left.x, left.y);
             // vertex(left.x, left.y);
@@ -733,7 +727,7 @@ class SkeletBlob extends Skelet{
                 ven.rotate(-PI/2);
                 ven.mult(p * th * nz);
                 ven.add(t1);
-                fill(leColor);
+                // fill(leColor);
                 vertex(ven.x, ven.y);
                 ven = ve.copy().normalize();
                 ven.rotate(+PI/2);
@@ -800,7 +794,7 @@ class SkeletBlob extends Skelet{
             let tent = skeletBlob.tentacleroots[it];
             let dir = p5.Vector.sub(tent[tent.length-1], this.tentrail[it]);
             let le = dir.mag();
-            let lim = max(1, le*2);
+            let lim = max(1, le*1);
             for(let k = 0; k < lim; k++){
                 let p = map(k, 0, lim, 0, 1);
                 let x = lerp(this.tentrail[it].x, tent[tent.length-1].x, p);
@@ -808,7 +802,7 @@ class SkeletBlob extends Skelet{
                 push();
                 translate(0,0,it+frameCount*.04)
                 fill(col);
-                rect(x, y, 118*power(noise(it,99.31), 3), 118*power(noise(it,99.31), 3));
+                rect(x, y, 33*power(noise(it,99.31), 3), 33*power(noise(it,99.31), 3));
                 let fl = .05 + .1*(-.5 + power(noise(it, frameCount*0.01, 22.66), 3));
                 fill(fl+.7, .25, .25);
                 let sz = 1.5 + 1.5*(-.5 + power(noise(it, frameCount*0.01, 831.41), 3));
@@ -883,7 +877,7 @@ function showall(){
     //pg.pop();
     //pg.line(0,0,mouseX-width/2,mouseY-height/2);
 
-    var an = fxrand()*PI;
+    var an = rand()*PI;
     var dir = [cos(an), sin(an)]
     blurH.setUniform('tex0', fbo.getTexture());
     //blurH.setUniform('tex1', mask);
@@ -926,11 +920,11 @@ function showall(){
     effect.setUniform('incolor', randomtint);
     effect.setUniform('seed', globalseed+random(.1,11));
     effect.setUniform('noiseamp', mouseX/width*0+1);
-    effect.setUniform('hasmargin', hasmargin);
-    //effect.setUniform('tintColor', HSVtoRGB(fxrand(), 0.2, 0.95));
-    var hue1 = fxrand();
-   //effect.setUniform('tintColor', HSVtoRGB(fxrand(),.3,.9));
-    //effect.setUniform('tintColor2', HSVtoRGB((hue1+.45+fxrand()*.1)%1,.3,.9));
+    effect.setUniform('hasmargin', 1);
+    //effect.setUniform('tintColor', HSVtoRGB(rand(), 0.2, 0.95));
+    var hue1 = rand();
+   //effect.setUniform('tintColor', HSVtoRGB(rand(),.3,.9));
+    //effect.setUniform('tintColor2', HSVtoRGB((hue1+.45+rand()*.1)%1,.3,.9));
     effect.setUniform('tintColor', [0.,0.,1.]);
     effect.setUniform('tintColor2', [0.,0.,1.]);
 
@@ -976,13 +970,11 @@ function min(a, b){
 
 
 
-// function mouseClicked(){
-//     for(let k = 0; k < skelet.constraints.length; k+=4){
-//         skelet.constraints[k].d *= 2;
-//     }
-    
-//     song.play();
-// }
+ function mouseClicked(){
+    drawingFbo.begin();
+    clear();
+    drawingFbo.end();
+ }
 
 function keyPressed(){
     if(key == 's'){
