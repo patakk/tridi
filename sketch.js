@@ -460,7 +460,7 @@ class Skelet {
 class SkeletBlob extends Skelet{
     constructor(){
         super();    
-        this.N = round(random(5, 44))*0+13;
+        this.N = round(random(5, 44))*0+19;
         this.NN = this.N;
         this.R = random(45, 55);
         this.blobpoints = [];
